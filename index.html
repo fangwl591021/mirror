@@ -14,7 +14,7 @@
             --secondary-bg: #F7F7F7;
             --text-main: #000000;
             --text-sub: #888888;
-            --warning: #ff9500;
+            --danger: #FF3B30;
         }
         body {
             font-family: -apple-system, sans-serif;
@@ -26,9 +26,9 @@
         .container {
             max-width: 500px;
             margin: 0 auto;
-            padding: 40px 20px;
+            padding: 20px;
         }
-        h2 { font-size: 20px; margin-bottom: 30px; text-align: center; font-weight: 500; }
+        h2 { font-size: 18px; margin-bottom: 20px; text-align: center; font-weight: 500; }
         .btn {
             width: 100%;
             padding: 14px;
@@ -37,12 +37,12 @@
             font-size: 16px;
             font-weight: 500;
             cursor: pointer;
-            margin-bottom: 12px;
-            transition: opacity 0.2s;
+            margin-bottom: 10px;
         }
         .btn-primary { background-color: var(--primary); color: #fff; }
         .btn-outline { background-color: transparent; color: var(--primary); border: 1px solid var(--primary); }
-        .input-group { margin-bottom: 20px; }
+        .btn-danger { background-color: var(--danger); color: #fff; margin-top: 20px; }
+        
         input {
             width: 100%;
             padding: 12px;
@@ -52,22 +52,13 @@
             font-size: 16px;
             text-align: center;
             background: var(--secondary-bg);
+            margin-bottom: 15px;
         }
         #qrcode { display: flex; justify-content: center; margin: 20px 0; }
-        #reader { width: 100%; border-radius: 8px; overflow: hidden; margin-bottom: 20px; display: none; }
-        .status { font-size: 13px; color: var(--text-sub); text-align: center; margin-top: 10px; }
-        .warning-box {
-            background: #fffbe6;
-            border: 1px solid #ffe58f;
-            padding: 10px;
-            border-radius: 8px;
-            font-size: 12px;
-            color: #856404;
-            margin-bottom: 15px;
-            display: none;
-        }
+        #reader { width: 100%; border-radius: 8px; overflow: hidden; margin-bottom: 15px; display: none; }
+        .status { font-size: 13px; color: var(--text-sub); text-align: center; }
         .hidden { display: none; }
-        video { width: 100%; border-radius: 8px; background: #000; display: none; }
+        video { width: 100%; border-radius: 8px; background: #000; display: none; margin-top: 10px; }
         #remoteVideo.active { display: block; }
         .id-badge { font-weight: bold; color: var(--primary); }
     </style>
@@ -77,37 +68,28 @@
 <div class="container">
     <h2 id="appTitle">MirrorStream</h2>
     
-    <!-- 初始選擇 -->
+    <!-- 模式選擇 -->
     <div id="setupMode">
         <button class="btn btn-primary" onclick="initReceiver()">我是電腦 (接收端)</button>
         <button class="btn btn-outline" onclick="initSender()">我是手機 (傳送端)</button>
     </div>
 
-    <!-- 接收端 UI (PC) -->
+    <!-- 接收端 UI -->
     <div id="receiverUI" class="hidden">
         <div id="qrcode"></div>
-        <p class="status">請用手機掃描上方代碼</p>
-        <p class="status">連線 ID: <span id="myIdDisplay" class="id-badge">...</span></p>
-        <video id="remoteVideo" autoplay playsinline controls></video>
+        <p class="status">連線 ID: <span id="myIdDisplay" class="id-badge">正在取得...</span></p>
+        <video id="remoteVideo" autoplay playsinline></video>
+        <button id="stopRecvBtn" class="btn btn-danger hidden" onclick="location.reload()">停止接收</button>
     </div>
 
-    <!-- 傳送端 UI (手機) -->
+    <!-- 傳送端 UI -->
     <div id="senderUI" class="hidden">
-        <div id="iosWarning" class="warning-box">
-            ⚠️ 偵測到 iOS 裝置：<br>
-            1. 請點擊右上角「...」選擇<b>「在 Safari 中開啟」</b>。<br>
-            2. iOS 網頁版僅支援「投影相機」，不支援全螢幕投影。
-        </div>
-
         <div id="reader"></div>
-        <button id="scanBtn" class="btn btn-outline" onclick="toggleScanner()">開啟相機掃描</button>
-        
-        <div class="input-group">
-            <input type="text" id="targetId" placeholder="手動輸入或掃描 ID">
-        </div>
-        
-        <button id="startBtn" class="btn btn-primary" onclick="startMirroring()">開始投影</button>
-        <p id="senderStatus" class="status">就緒</p>
+        <button id="scanBtn" class="btn btn-outline" onclick="toggleScanner()">掃描電腦 QR Code</button>
+        <input type="text" id="targetId" placeholder="或手動輸入 ID">
+        <button id="startBtn" class="btn btn-primary" onclick="startMirroring()">開始鏡像投影</button>
+        <button id="stopBtn" class="btn btn-danger hidden" onclick="stopMirroring()">停止投影</button>
+        <p id="senderStatus" class="status">準備就緒</p>
     </div>
 </div>
 
@@ -115,12 +97,10 @@
     let peer = null;
     let localStream = null;
     let html5QrCode = null;
-
-    // 檢查是否為 iOS
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    let currentCall = null;
 
     function initReceiver() {
-        document.getElementById('appTitle').innerText = "等待連線";
+        document.getElementById('appTitle').innerText = "等待鏡像連線";
         showUI('receiverUI');
         peer = new Peer();
         peer.on('open', (id) => {
@@ -128,22 +108,22 @@
             generateQR(id);
         });
         peer.on('call', (call) => {
+            currentCall = call;
             call.answer();
             call.on('stream', (stream) => {
                 const video = document.getElementById('remoteVideo');
                 video.srcObject = stream;
                 video.classList.add('active');
-                document.getElementById('qrcode').style.display = "none";
-                document.getElementById('appTitle').innerText = "正在投影";
+                document.getElementById('qrcode').classList.add('hidden');
+                document.getElementById('stopRecvBtn').classList.remove('hidden');
+                document.getElementById('appTitle').innerText = "投影中";
             });
         });
     }
 
     function initSender() {
-        document.getElementById('appTitle').innerText = "投影至電腦";
+        document.getElementById('appTitle').innerText = "手機鏡像投影";
         showUI('senderUI');
-        if (isIOS) document.getElementById('iosWarning').style.display = 'block';
-
         const tid = new URLSearchParams(window.location.search).get('target');
         if (tid) document.getElementById('targetId').value = tid;
         peer = new Peer();
@@ -151,71 +131,60 @@
 
     async function toggleScanner() {
         const readerDiv = document.getElementById('reader');
-        const scanBtn = document.getElementById('scanBtn');
-        
-        if (readerDiv.style.display === "block") {
-            stopScanner();
-            return;
-        }
-
+        if (readerDiv.style.display === "block") { stopScanner(); return; }
         readerDiv.style.display = "block";
-        scanBtn.innerText = "關閉掃描器";
-        
+        document.getElementById('scanBtn').innerText = "關閉掃描器";
         html5QrCode = new Html5Qrcode("reader");
         try {
-            await html5QrCode.start(
-                { facingMode: "environment" }, 
-                { fps: 10, qrbox: { width: 250, height: 250 } },
-                (decodedText) => {
-                    try {
-                        const url = new URL(decodedText);
-                        const tid = url.searchParams.get('target') || decodedText;
-                        document.getElementById('targetId').value = tid;
-                    } catch(e) {
-                        document.getElementById('targetId').value = decodedText;
-                    }
-                    stopScanner();
-                }
-            );
-        } catch (err) {
-            alert("請確保已授權相機權限且在 HTTPS 環境下開啟");
-            stopScanner();
-        }
+            await html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (text) => {
+                try {
+                    const url = new URL(text);
+                    document.getElementById('targetId').value = url.searchParams.get('target') || text;
+                } catch { document.getElementById('targetId').value = text; }
+                stopScanner();
+            });
+        } catch (e) { alert("開啟相機失敗"); stopScanner(); }
     }
 
     function stopScanner() {
         if (html5QrCode) {
             html5QrCode.stop().then(() => {
                 document.getElementById('reader').style.display = "none";
-                document.getElementById('scanBtn').innerText = "開啟相機掃描";
+                document.getElementById('scanBtn').innerText = "掃描電腦 QR Code";
             });
         }
     }
 
     async function startMirroring() {
         const tid = document.getElementById('targetId').value;
-        if (!tid) return alert("請輸入目標 ID");
+        if (!tid) return alert("請輸入 ID");
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+            return alert("您的瀏覽器不支援螢幕鏡像投影 (iOS Safari 限制)\n請使用 Android Chrome 或 PC 瀏覽器嘗試。");
+        }
 
         try {
-            // 優先嘗試螢幕投影，若失敗(如iOS)則嘗試開啟相機
-            if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
-                localStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-            } else {
-                console.log("不支援 getDisplayMedia, 嘗試相機備援");
-                localStream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "environment" }, 
-                    audio: false 
-                });
-            }
-
-            const call = peer.call(tid, localStream);
-            document.getElementById('startBtn').disabled = true;
-            document.getElementById('senderStatus').innerText = "投影中，請勿離開網頁";
+            // 嚴格請求螢幕鏡像
+            localStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+            currentCall = peer.call(tid, localStream);
             
-            localStream.getVideoTracks()[0].onended = () => location.reload();
+            document.getElementById('startBtn').classList.add('hidden');
+            document.getElementById('scanBtn').classList.add('hidden');
+            document.getElementById('stopBtn').classList.remove('hidden');
+            document.getElementById('senderStatus').innerText = "鏡像投影中";
+            
+            localStream.getVideoTracks()[0].onended = () => stopMirroring();
         } catch (err) {
-            alert("投影失敗: " + err.message + "\n請確認是否使用 Safari/Chrome 且為 HTTPS 環境。");
+            alert("投影失敗: " + err.message);
         }
+    }
+
+    function stopMirroring() {
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+        }
+        if (currentCall) currentCall.close();
+        location.reload();
     }
 
     function generateQR(id) {
