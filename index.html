@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MirrorStream - 無線螢幕投影</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        :root {
+            --bg: #f8f9fa;
+            --primary: #007aff;
+            --secondary: #5856d6;
+            --text: #1c1c1e;
+        }
+        body {
+            font-family: -apple-system, system-ui, sans-serif;
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.5;
+        }
+        .app-container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+        .card {
+            background: #fff;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+        .btn {
+            display: block;
+            width: 100%;
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 10px 0;
+            transition: transform 0.1s;
+        }
+        .btn:active { transform: scale(0.98); }
+        .btn-secondary { background: var(--secondary); }
+        
+        video {
+            width: 100%;
+            border-radius: 12px;
+            background: #000;
+            display: none;
+            margin-top: 15px;
+        }
+        #qrcode {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        .status-tag {
+            font-size: 13px;
+            color: #8e8e93;
+            margin-top: 10px;
+        }
+        .hidden { display: none; }
+        #remoteVideo.active { display: block; }
+        
+        .id-badge {
+            background: #e9e9eb;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <h2>MirrorStream</h2>
+    
+    <div id="setupMode" class="card">
+        <p>請選擇此裝置的角色</p>
+        <button class="btn" onclick="initReceiver()">我是電腦 (接收端)</button>
+        <button class="btn btn-secondary" onclick="initSender()">我是手機 (傳送端)</button>
+        <p class="status-tag">提示：請確保在 HTTPS 環境下執行</p>
+    </div>
+
+    <!-- 接收端 (PC) -->
+    <div id="receiverUI" class="card hidden">
+        <h3 id="recvStatus">等待連線...</h3>
+        <div id="qrcode"></div>
+        <p class="status-tag">請用手機掃描上方 QR Code</p>
+        <p>連線 ID: <span id="myIdDisplay" class="id-badge">正在取得...</span></p>
+        <video id="remoteVideo" autoplay playsinline controls></video>
+    </div>
+
+    <!-- 傳送端 (手機) -->
+    <div id="senderUI" class="card hidden">
+        <h3>投影到電腦</h3>
+        <p>目標電腦 ID:</p>
+        <input type="text" id="targetId" placeholder="輸入 ID" style="padding:12px; width:90%; border-radius:8px; border:1px solid #ddd; margin-bottom:15px; text-align:center;">
+        <button id="startBtn" class="btn" onclick="startMirroring()">開始共享螢幕</button>
+        <div id="senderStatus" class="status-tag">準備就緒</div>
+    </div>
+</div>
+
+<script>
+    let peer = null;
+    let localStream = null;
+
+    function initReceiver() {
+        showUI('receiverUI');
+        peer = new Peer();
+        
+        peer.on('open', (id) => {
+            document.getElementById('myIdDisplay').innerText = id;
+            generateQR(id);
+        });
+
+        peer.on('call', (call) => {
+            call.answer();
+            call.on('stream', (remoteStream) => {
+                const video = document.getElementById('remoteVideo');
+                video.srcObject = remoteStream;
+                video.classList.add('active');
+                document.getElementById('recvStatus').innerText = "投影中";
+                document.getElementById('qrcode').classList.add('hidden');
+            });
+        });
+
+        peer.on('error', (err) => alert("連線錯誤: " + err.type));
+    }
+
+    function initSender() {
+        showUI('senderUI');
+        const urlParams = new URLSearchParams(window.location.search);
+        const tid = urlParams.get('target');
+        if (tid) document.getElementById('targetId').value = tid;
+        peer = new Peer();
+    }
+
+    async function startMirroring() {
+        const tid = document.getElementById('targetId').value;
+        if (!tid) return alert("請輸入目標 ID");
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+            return alert("抱歉，您的手機瀏覽器不支援螢幕投影功能 (iOS Safari 限制較多，建議使用 Android Chrome)");
+        }
+
+        try {
+            // 嘗試請求螢幕共享
+            localStream = await navigator.mediaDevices.getDisplayMedia({
+                video: true,
+                audio: true
+            });
+
+            document.getElementById('senderStatus').innerText = "連線中...";
+            const call = peer.call(tid, localStream);
+            
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('senderStatus').innerText = "投影中！請保持此網頁開啟";
+
+            localStream.getVideoTracks()[0].onended = () => {
+                alert("共享已停止");
+                location.reload();
+            };
+
+        } catch (err) {
+            console.error(err);
+            alert("啟動失敗: " + err.message);
+        }
+    }
+
+    function generateQR(id) {
+        const url = window.location.href.split('?')[0] + "?target=" + id;
+        new QRCode(document.getElementById("qrcode"), {
+            text: url,
+            width: 180,
+            height: 180
+        });
+    }
+
+    function showUI(id) {
+        document.getElementById('setupMode').classList.add('hidden');
+        document.getElementById(id).classList.remove('hidden');
+    }
+</script>
+
+</body>
+</html>
