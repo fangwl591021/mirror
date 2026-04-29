@@ -11,87 +11,126 @@
         :root {
             --primary: #07C160;
             --bg: #FFFFFF;
-            --secondary-bg: #F7F7F7;
-            --text-main: #000000;
+            --line-gray: #EDEDED;
+            --text-main: #111111;
             --text-sub: #888888;
             --danger: #FF3B30;
         }
         body {
-            font-family: -apple-system, sans-serif;
+            font-family: -apple-system, "Helvetica Neue", sans-serif;
             margin: 0;
             background-color: var(--bg);
             color: var(--text-main);
             -webkit-tap-highlight-color: transparent;
         }
         .container {
-            max-width: 500px;
+            max-width: 100%;
             margin: 0 auto;
-            padding: 20px;
+            padding: 0 16px;
         }
-        h2 { font-size: 18px; margin-bottom: 20px; text-align: center; font-weight: 500; }
+        .header {
+            font-size: 17px;
+            padding: 16px 0;
+            text-align: center;
+            border-bottom: 0.5px solid var(--line-gray);
+            font-weight: 500;
+        }
+        .section {
+            padding: 20px 0;
+            text-align: center;
+        }
         .btn {
             width: 100%;
-            padding: 14px;
-            border-radius: 8px;
+            padding: 16px;
             border: none;
             font-size: 16px;
-            font-weight: 500;
             cursor: pointer;
-            margin-bottom: 10px;
+            display: block;
+            text-align: center;
+            box-sizing: border-box;
+            background: none;
         }
-        .btn-primary { background-color: var(--primary); color: #fff; }
-        .btn-outline { background-color: transparent; color: var(--primary); border: 1px solid var(--primary); }
-        .btn-danger { background-color: var(--danger); color: #fff; margin-top: 20px; }
+        .btn-primary { color: var(--primary); font-weight: 500; }
+        .btn-danger { color: var(--danger); }
+        .divider { height: 0.5px; background: var(--line-gray); width: 100%; }
         
         input {
             width: 100%;
-            padding: 12px;
+            padding: 15px;
             box-sizing: border-box;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-size: 16px;
+            border: none;
+            font-size: 28px;
             text-align: center;
-            background: var(--secondary-bg);
-            margin-bottom: 15px;
+            background: var(--line-gray);
+            border-radius: 8px;
+            margin: 15px 0;
             text-transform: uppercase;
+            letter-spacing: 6px;
+            font-weight: bold;
         }
         #qrcode { display: flex; justify-content: center; margin: 20px 0; }
-        #reader { width: 100%; border-radius: 8px; overflow: hidden; margin-bottom: 15px; display: none; }
-        .status { font-size: 13px; color: var(--text-sub); text-align: center; }
+        #reader { width: 100%; border-radius: 8px; overflow: hidden; margin-bottom: 15px; display: none; background: #000; }
+        .status { font-size: 13px; color: var(--text-sub); margin-bottom: 10px; }
         .hidden { display: none; }
-        video { width: 100%; border-radius: 8px; background: #000; display: none; margin-top: 10px; }
+        video { width: 100%; background: #000; display: none; border-radius: 8px; margin-top: 10px; }
         #remoteVideo.active { display: block; }
-        .id-badge { font-weight: bold; color: var(--primary); font-size: 24px; letter-spacing: 2px; }
+        .id-display { font-size: 40px; color: var(--primary); font-weight: bold; letter-spacing: 8px; margin: 15px 0; }
+        
+        .alert-bar {
+            background: #FFF9E6;
+            color: #856404;
+            padding: 14px;
+            font-size: 14px;
+            border-radius: 8px;
+            margin-top: 15px;
+            line-height: 1.5;
+            text-align: left;
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2 id="appTitle">MirrorStream</h2>
+    <div class="header" id="appTitle">MirrorStream</div>
     
-    <!-- 模式選擇 -->
+    <!-- 初始進入介面 -->
     <div id="setupMode">
-        <button class="btn btn-primary" onclick="initReceiver()">我是電腦 (接收端)</button>
-        <button class="btn btn-outline" onclick="initSender()">我是手機 (傳送端)</button>
+        <div class="section">
+            <button class="btn btn-primary" onclick="initReceiver()">[ 點此開始接收投影 (電腦端) ]</button>
+            <div class="divider"></div>
+            <button class="btn btn-primary" onclick="initSender()">[ 點此開始傳送畫面 (手機端) ]</button>
+        </div>
     </div>
 
-    <!-- 接收端 UI -->
+    <!-- 接收端 UI (電腦) -->
     <div id="receiverUI" class="hidden">
-        <div id="qrcode"></div>
-        <p class="status">連線 ID</p>
-        <p class="status"><span id="myIdDisplay" class="id-badge">....</span></p>
-        <video id="remoteVideo" autoplay playsinline></video>
-        <button id="stopRecvBtn" class="btn btn-danger hidden" onclick="location.reload()">停止接收</button>
+        <div class="section">
+            <div id="qrcode"></div>
+            <div class="status">連線代碼</div>
+            <div id="myIdDisplay" class="id-display">....</div>
+            <video id="remoteVideo" autoplay playsinline></video>
+            <button id="stopRecvBtn" class="btn btn-danger hidden" onclick="location.reload()">[ 停止連線 ]</button>
+        </div>
     </div>
 
-    <!-- 傳送端 UI -->
+    <!-- 傳送端 UI (手機) -->
     <div id="senderUI" class="hidden">
-        <div id="reader"></div>
-        <button id="scanBtn" class="btn btn-outline" onclick="toggleScanner()">掃描電腦 QR Code</button>
-        <input type="text" id="targetId" placeholder="輸入 4 碼連線 ID" maxlength="4">
-        <button id="startBtn" class="btn btn-primary" onclick="startMirroring()">開始鏡像投影</button>
-        <button id="stopBtn" class="btn btn-danger hidden" onclick="stopMirroring()">停止投影</button>
-        <p id="senderStatus" class="status">準備就緒</p>
+        <div class="section">
+            <div id="reader"></div>
+            <button id="scanBtn" class="btn btn-primary" onclick="toggleScanner()">[ 開啟相機掃描 ]</button>
+            <div class="divider" style="margin: 10px 0;"></div>
+            <input type="text" id="targetId" placeholder="輸入 4 碼 ID" maxlength="4" autocomplete="off">
+            <button id="startBtn" class="btn btn-primary" onclick="startMirroring()">[ 啟動鏡像投影 ]</button>
+            <button id="stopBtn" class="btn btn-danger hidden" onclick="stopMirroring()">[ 停止投影 ]</button>
+            
+            <div id="androidNotice" class="alert-bar hidden">
+                <b>Android 使用者注意：</b><br>
+                1. 請勿在 LINE 內直接開啟。<br>
+                2. 請點擊右上角「...」並選擇「使用 Chrome 開啟」。<br>
+                3. 若點擊啟動無反應，請檢查 Chrome 權限。
+            </div>
+            <p id="senderStatus" class="status" style="margin-top:20px;">等待操作</p>
+        </div>
     </div>
 </div>
 
@@ -101,116 +140,93 @@
     let html5QrCode = null;
     let currentCall = null;
 
-    // 產生 4 碼隨機 ID (英數混合)
-    function generateShortId() {
-        return Math.random().toString(36).substr(2, 4).toUpperCase();
-    }
+    // 環境檢查
+    const isLine = /line/i.test(navigator.userAgent);
+    const isAndroid = /android/i.test(navigator.userAgent);
 
     function initReceiver() {
-        const shortId = generateShortId();
-        document.getElementById('appTitle').innerText = "等待鏡像連線";
+        const shortId = Math.random().toString(36).substr(2, 4).toUpperCase();
+        document.getElementById('appTitle').innerText = "電腦接收端";
         showUI('receiverUI');
-        
-        // 使用自定義的短 ID 初始化 Peer
         peer = new Peer(shortId);
-        
-        peer.on('open', (id) => {
+        peer.on('open', id => {
             document.getElementById('myIdDisplay').innerText = id;
-            generateQR(id);
+            const u = window.location.href.split('?')[0] + "?target=" + id;
+            new QRCode(document.getElementById("qrcode"), { text: u, width: 180, height: 180 });
         });
-
-        peer.on('call', (call) => {
+        peer.on('call', call => {
             currentCall = call;
             call.answer();
-            call.on('stream', (stream) => {
-                const video = document.getElementById('remoteVideo');
-                video.srcObject = stream;
-                video.classList.add('active');
+            call.on('stream', stream => {
+                const v = document.getElementById('remoteVideo');
+                v.srcObject = stream;
+                v.classList.add('active');
                 document.getElementById('qrcode').classList.add('hidden');
                 document.getElementById('stopRecvBtn').classList.remove('hidden');
-                document.getElementById('appTitle').innerText = "投影中";
             });
         });
-
-        peer.on('error', (err) => {
-            if (err.type === 'unavailable-id') {
-                // ID 重複則重新整理再試一次
-                location.reload();
-            } else {
-                console.error(err);
-            }
-        });
+        peer.on('error', e => { if(e.type==='unavailable-id') location.reload(); });
     }
 
     function initSender() {
-        document.getElementById('appTitle').innerText = "手機鏡像投影";
+        document.getElementById('appTitle').innerText = "手機傳送端";
         showUI('senderUI');
+        if(isAndroid && isLine) document.getElementById('androidNotice').classList.remove('hidden');
         const tid = new URLSearchParams(window.location.search).get('target');
-        if (tid) document.getElementById('targetId').value = tid;
+        if(tid) document.getElementById('targetId').value = tid.toUpperCase();
         peer = new Peer();
     }
 
     async function toggleScanner() {
-        const readerDiv = document.getElementById('reader');
-        if (readerDiv.style.display === "block") { stopScanner(); return; }
-        readerDiv.style.display = "block";
-        document.getElementById('scanBtn').innerText = "關閉掃描器";
+        const r = document.getElementById('reader');
+        if(r.style.display === "block") { stopScanner(); return; }
+        r.style.display = "block";
+        document.getElementById('scanBtn').innerText = "[ 取消掃描 ]";
         html5QrCode = new Html5Qrcode("reader");
         try {
-            await html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (text) => {
+            await html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, text => {
                 try {
                     const url = new URL(text);
-                    document.getElementById('targetId').value = url.searchParams.get('target') || text;
-                } catch { document.getElementById('targetId').value = text; }
+                    document.getElementById('targetId').value = url.searchParams.get('target').toUpperCase();
+                } catch { document.getElementById('targetId').value = text.toUpperCase(); }
                 stopScanner();
             });
-        } catch (e) { alert("開啟相機失敗"); stopScanner(); }
+        } catch (e) { alert("無法存取相機"); stopScanner(); }
     }
 
     function stopScanner() {
-        if (html5QrCode) {
-            html5QrCode.stop().then(() => {
-                document.getElementById('reader').style.display = "none";
-                document.getElementById('scanBtn').innerText = "掃描電腦 QR Code";
-            });
-        }
+        if(html5QrCode) html5QrCode.stop().then(() => {
+            document.getElementById('reader').style.display = "none";
+            document.getElementById('scanBtn').innerText = "[ 開啟相機掃描 ]";
+        });
     }
 
     async function startMirroring() {
-        let tid = document.getElementById('targetId').value;
-        if (!tid) return alert("請輸入 ID");
-        tid = tid.toUpperCase(); // 強制轉大寫
+        const tid = document.getElementById('targetId').value.toUpperCase();
+        if(!tid) return alert("請輸入代碼");
 
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-            return alert("您的瀏覽器不支援螢幕鏡像投影\n請使用 Android Chrome 或 PC 瀏覽器嘗試。");
+        if(!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+            alert("目前環境不支援投影。\n請點擊右上角『...』選擇『在 Chrome 中開啟』");
+            return;
         }
 
         try {
             localStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
             currentCall = peer.call(tid, localStream);
-            
             document.getElementById('startBtn').classList.add('hidden');
             document.getElementById('scanBtn').classList.add('hidden');
+            document.getElementById('targetId').classList.add('hidden');
             document.getElementById('stopBtn').classList.remove('hidden');
-            document.getElementById('senderStatus').innerText = "鏡像投影中";
-            
+            document.getElementById('senderStatus').innerText = "鏡像投影中...";
             localStream.getVideoTracks()[0].onended = () => stopMirroring();
         } catch (err) {
-            alert("投影失敗: " + err.message);
+            alert("啟動失敗: " + err.message);
         }
     }
 
     function stopMirroring() {
-        if (localStream) {
-            localStream.getTracks().forEach(track => track.stop());
-        }
-        if (currentCall) currentCall.close();
+        if(localStream) localStream.getTracks().forEach(t => t.stop());
         location.reload();
-    }
-
-    function generateQR(id) {
-        const url = window.location.href.split('?')[0] + "?target=" + id;
-        new QRCode(document.getElementById("qrcode"), { text: url, width: 200, height: 200 });
     }
 
     function showUI(id) {
